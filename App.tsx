@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList } from 'react-native';
-import RenderItem from "./RenderItem";
+import React, { useEffect, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import RenderItem from "./RenderItem"; 
 import styles from "./Styles";
 
 export interface Task {
@@ -11,36 +12,69 @@ export interface Task {
 
 export default function App() {
   const [text, setText] = useState('');
-  const [task, setTask] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  // Guardar datos en AsyncStorage
+  const storeData = async (value: Task[]) => {
+    try {
+      await AsyncStorage.setItem('my-key', JSON.stringify(value));
+    } catch (e) {
+      console.error("Error saving data", e);
+    }
+  };
+
+  // Obtener datos de AsyncStorage
+  const getData = async () => {
+    try {
+      const value = await AsyncStorage.getItem('my-key');
+      if (value !== null) {
+        const tasksLocal = JSON.parse(value);
+        setTasks(tasksLocal);
+      }
+    } catch (e) {
+      console.error("Error reading data", e);
+    }
+  };
+
+  // Obtener datos al montar el componente
+  useEffect(() => {
+    getData();
+  }, []);
+
+  // Guardar datos cuando cambian las tareas
+  useEffect(() => {
+    storeData(tasks);
+  }, [tasks]);
+
+  // Añadir nueva tarea
   const addTask = () => {
-    const tmp = [...task];
+    if (tasks.some(task => task.title === text)) {
+      Alert.alert("Error Corazon", "Ya existe una tarea con el mismo nombre, cambielo xfa");
+      return;
+    }
+
     const newTask = {
       title: text,
       done: false,
-      date: new Date(),
+      date: new Date()
     };
-    tmp.push(newTask);
-    setTask(tmp);
+    setTasks(prevTasks => [...prevTasks, newTask]);
     setText('');
-  }
+  };
+
+  // Marcar tarea como hecha/no hecha
   const markDone = (task: Task) => {
-        // Lógica para marcar como hecho
+    setTasks(prevTasks =>
+      prevTasks.map(t =>
+        t.title === task.title ? { ...t, done: !t.done } : t
+      )
+    );
+  };
 
-    const tmp = [...tasks];
-    const index = tmp.findIndex(el => el.title === task.title); // Corregido findIndex
-    const todo = tmp[index]; // Corregido task por tmp
-    todo.done = !todo.done;
-    setTask(tmp);
-  }
-  
-
-  const deleteFunction = () => {
-    // Lógica para eliminar
-    const tmp = [...tasks];
-    const index = tmp.findIndex(el => el.title === task.title); // Corregido findIndex
-    tmp.splice(index, 1);
-    setTask(tmp);
-      }
+  // Eliminar tarea
+  const deleteFunction = (task: Task) => {
+    setTasks(prevTasks => prevTasks.filter(t => t.title !== task.title));
+  };
 
   return (
     <View style={styles.container}>
@@ -59,7 +93,7 @@ export default function App() {
 
       <View style={styles.scrollContainer}>
         <FlatList
-          data={task}
+          data={tasks}
           renderItem={({ item }) => (
             <RenderItem
               item={item}
@@ -67,13 +101,10 @@ export default function App() {
               deleteFunction={deleteFunction}
             />
           )}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={(item) => item.title}
         />
       </View>
     </View>
   );
 }
-
-
-
 
